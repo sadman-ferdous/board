@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Final Whiteboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-bg: #1a1a1a; --secondary-bg: #2c2c2c; --toolbar-bg: #222;
+            --text-color: #f0f0f0; --accent-color: #007bff; --border-color: #444;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--primary-bg); color: var(--text-color); overflow: hidden; }
+        .app-container { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
+        .toolbar { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; background-color: var(--toolbar-bg); padding: 10px; border-bottom: 2px solid var(--border-color); gap: 10px; }
+        .tool-group { display: flex; align-items: center; background-color: var(--secondary-bg); border-radius: 8px; padding: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .tool { background: none; border: none; color: var(--text-color); font-size: 1.1rem; padding: 8px 12px; cursor: pointer; transition: background-color 0.2s; border-radius: 5px; }
+        .tool:hover { background-color: var(--accent-color); color: white; }
+        .tool.active { background-color: var(--accent-color); box-shadow: inset 0 0 5px rgba(0,0,0,0.5); }
+        .options-wrapper { display: flex; align-items: center; gap: 10px; padding: 0 10px; }
+        .hidden { display: none !important; }
+        input[type="color"] { -webkit-appearance: none; -moz-appearance: none; appearance: none; width: 35px; height: 35px; background-color: transparent; border: none; cursor: pointer; }
+        input[type="color"]::-webkit-color-swatch { border-radius: 50%; border: 2px solid var(--border-color); }
+        #bg-color-picker, #fill-color-picker, #shape-stroke-color-picker, #pen-color-picker { display: none; }
+        input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+        input[type="range"] { cursor: pointer; width: 100px; }
+        .board-size-group input { width: 70px; background-color: var(--primary-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; margin: 0 5px; }
+        .canvas-container { flex-grow: 1; display: flex; justify-content: center; align-items: center; overflow: auto; background-color: var(--primary-bg); padding: 1rem; }
+        canvas { box-shadow: 0 0 15px rgba(0,0,0,0.5); }
+        @media (max-width: 1200px) { .toolbar { flex-direction: column; align-items: stretch; } .tool-group { justify-content: center; } }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="toolbar">
+            <div class="tool-group">
+                <button id="pen-tool" class="tool" title="Pen"><i class="fas fa-pen"></i></button>
+                <button id="marker-tool" class="tool" title="Marker"><i class="fas fa-highlighter"></i></button>
+                <div id="pen-options-wrapper" class="options-wrapper">
+                    <label for="pen-color-picker" class="tool" title="Pen Color"><i class="fas fa-paint-brush"></i></label>
+                    <input type="color" id="pen-color-picker" value="#FFFFFF">
+                    <input type="range" id="pen-size" min="1" max="100" value="5" title="Pen Size">
+                </div>
+            </div>
+            <div class="tool-group">
+                <button id="eraser-tool" class="tool" title="Eraser"><i class="fas fa-eraser"></i></button>
+                <button id="stroke-eraser-tool" class="tool" title="Erase Entire Stroke"><i class="fas fa-wand-magic-sparkles"></i></button>
+                <div id="eraser-options-wrapper" class="options-wrapper hidden">
+                    <input type="range" id="eraser-size" min="1" max="200" value="20" title="Eraser Size">
+                </div>
+            </div>
+            <div class="tool-group">
+                <button id="select-tool" class="tool" title="Select & Resize"><i class="fas fa-mouse-pointer"></i></button>
+                <button id="line-tool" class="tool" title="Line"><i class="fas fa-minus"></i></button>
+                <button id="rectangle-tool" class="tool" title="Rectangle"><i class="far fa-square"></i></button>
+                <button id="circle-tool" class="tool" title="Circle"><i class="far fa-circle"></i></button>
+            </div>
+            <div id="shape-stroke-options-wrapper" class="tool-group hidden">
+                <label for="shape-stroke-color-picker" class="tool" title="Shape Stroke Color"><i class="fas fa-palette"></i></label>
+                <input type="color" id="shape-stroke-color-picker" value="#FFFFFF">
+                <input type="range" id="shape-stroke-size" min="1" max="100" value="5" title="Shape Stroke Size">
+            </div>
+            <div id="shape-fill-options-wrapper" class="tool-group hidden">
+                 <label for="fill-color-picker" class="tool" title="Fill Color"><i class="fas fa-fill-drip"></i></label>
+                 <input type="color" id="fill-color-picker" value="#333333">
+                 <input type="checkbox" id="fill-shape-checkbox" title="Enable Fill">
+            </div>
+            <div class="tool-group">
+                <button id="clear-board" class="tool" title="Clear Board"><i class="fas fa-trash-alt"></i></button>
+                <button id="download-board" class="tool" title="Save as Image"><i class="fas fa-download"></i></button>
+                <label for="bg-color-picker" class="tool" title="Background Color"><i class="fas fa-palette"></i></label>
+                <input type="color" id="bg-color-picker" value="#1a1a1a">
+            </div>
+            <div class="tool-group board-size-group">
+                <input type="number" id="board-width" value="1920" title="Board Width">
+                <span>x</span>
+                <input type="number" id="board-height" value="1080" title="Board Height">
+                <button id="set-board-size" class="tool" title="Set Size"><i class="fas fa-check"></i></button>
+            </div>
+            <div class="tool-group slide-controls">
+                <button id="prev-slide" class="tool" title="Previous Slide"><i class="fas fa-chevron-left"></i></button>
+                <span id="slide-indicator">1 / 1</span>
+                <button id="next-slide" class="tool" title="Next Slide"><i class="fas fa-chevron-right"></i></button>
+                <button id="add-slide" class="tool" title="Add New Slide"><i class="fas fa-plus"></i></button>
+                <button id="delete-slide" class="tool" title="Delete Current Slide"><i class="fas fa-minus"></i></button>
+            </div>
+        </div>
+        <div class="canvas-container"><canvas id="whiteboard"></canvas></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var canvas = document.getElementById('whiteboard');
+            var ctx = canvas.getContext('2d');
+            var penOptionsWrapper = document.getElementById('pen-options-wrapper');
+            var eraserOptionsWrapper = document.getElementById('eraser-options-wrapper');
+            var shapeStrokeOptionsWrapper = document.getElementById('shape-stroke-options-wrapper');
+            var shapeFillOptionsWrapper = document.getElementById('shape-fill-options-wrapper');
+
+            var slides = [];
+            var currentSlideIndex = 0;
+            var currentTool = 'pen';
+            var isDrawing = false;
+            
+            var shapeStartX, shapeStartY, previewSnapshot;
+            var selectedShapeIndex = null;
+            var isDragging = false;
+            var isResizing = false;
+            var resizeHandle = '';
+            var dragOffsetX, dragOffsetY;
+
+            function initializeCanvas() {
+                createInitialSlide();
+                resizeCanvas();
+                addEventListeners();
+                selectTool('pen');
+            }
+
+            function createInitialSlide() {
+                if (slides.length === 0) {
+                    slides.push({ paths: [], backgroundColor: '#1a1a1a' });
+                    updateSlideIndicator();
+                }
+            }
+            
+            function updateSlideIndicator() {
+                document.getElementById('slide-indicator').textContent = (currentSlideIndex + 1) + ' / ' + slides.length;
+            }
+
+            function resizeCanvas() {
+                var width = parseInt(document.getElementById('board-width').value, 10);
+                var height = parseInt(document.getElementById('board-height').value, 10);
+                if (width > 0 && height > 0) {
+                    canvas.width = width;
+                    canvas.height = height;
+                    drawSlide(currentSlideIndex);
+                }
+            }
+
+            function drawSlide(index) {
+                if (!slides[index]) return;
+                var slide = slides[index];
+                var bgColor = slide.backgroundColor || '#1a1a1a';
+                ctx.fillStyle = bgColor;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                slide.paths.forEach(function(path) {
+                    if (path.type === 'stroke') drawStroke(path);
+                    else if (path.type === 'shape') drawShape(path);
+                    else if (path.type === 'line') drawLine(path);
+                });
+                
+                if (selectedShapeIndex !== null && slides[index].paths[selectedShapeIndex]) {
+                    drawSelectionHandles(slides[index].paths[selectedShapeIndex]);
+                }
+            }
+
+            function drawStroke(path) {
+                if (!path || !path.points || path.points.length === 0) return;
+                ctx.strokeStyle = path.color;
+                ctx.lineWidth = path.size;
+                ctx.globalAlpha = path.tool === 'marker' ? 0.3 : 1.0;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                
+                var points = path.points;
+                if (points.length < 3) {
+                    if (points.length === 1) { ctx.fillStyle = path.color; ctx.arc(points[0].x, points[0].y, path.size / 2, 0, Math.PI * 2); ctx.fill(); } 
+                    else { ctx.moveTo(points[0].x, points[0].y); ctx.lineTo(points[1].x, points[1].y); ctx.stroke(); }
+                } else {
+                    ctx.moveTo(points[0].x, points[0].y);
+                    for (var i = 1; i < points.length - 2; i++) {
+                        var midPoint = { x: (points[i].x + points[i + 1].x) / 2, y: (points[i].y + points[i + 1].y) / 2 };
+                        ctx.quadraticCurveTo(points[i].x, points[i].y, midPoint.x, midPoint.y);
+                    }
+                    ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+                    ctx.stroke();
+                }
+                ctx.globalAlpha = 1.0;
+            }
+
+            function drawShape(path) {
+                if (!path) return;
+                ctx.globalAlpha = 1.0;
+                ctx.beginPath();
+                if (path.shape === 'rectangle') {
+                    ctx.rect(path.x, path.y, path.width, path.height);
+                } else if (path.shape === 'circle') {
+                    var radius = Math.sqrt(Math.pow(path.width, 2) + Math.pow(path.height, 2)) / 2;
+                    ctx.arc(path.x + path.width / 2, path.y + path.height / 2, radius, 0, Math.PI * 2);
+                }
+                
+                if (path.isFilled) {
+                    ctx.fillStyle = path.fillColor;
+                    ctx.fill();
+                }
+                ctx.strokeStyle = path.color;
+                ctx.lineWidth = path.size;
+                ctx.stroke();
+            }
+
+            function drawLine(path) {
+                if (!path) return;
+                ctx.strokeStyle = path.color;
+                ctx.lineWidth = path.size;
+                ctx.globalAlpha = 1.0;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(path.x1, path.y1);
+                ctx.lineTo(path.x2, path.y2);
+                ctx.stroke();
+            }
+
+            function drawSelectionHandles(shape) {
+                var handles = getHandles(shape);
+                ctx.strokeStyle = '#007bff';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.setLineDash([4, 2]);
+                var box = handles.box;
+                ctx.strokeRect(box.x, box.y, box.width, box.height);
+                ctx.setLineDash([]);
+                
+                ctx.fillStyle = '#fff';
+                Object.values(handles.points).forEach(function(handle) {
+                    ctx.fillRect(handle.x - 4, handle.y - 4, 8, 8);
+                    ctx.strokeRect(handle.x - 4, handle.y - 4, 8, 8);
+                });
+            }
+
+            function startDrawing(e) {
+                e.preventDefault();
+                var coords = getEventCoordinates(e);
+                var startX = coords[0];
+                var startY = coords[1];
+
+                if (currentTool === 'select') { handleSelection(startX, startY); return; }
+                if (currentTool === 'stroke-eraser') { eraseEntireStrokeAt(startX, startY); return; }
+
+                isDrawing = true;
+                if (currentTool === 'pen' || currentTool === 'marker' || currentTool === 'eraser') {
+                    var size = currentTool === 'eraser' ? document.getElementById('eraser-size').value : document.getElementById('pen-size').value;
+                    var newStroke = {
+                        type: 'stroke', tool: currentTool,
+                        color: currentTool === 'eraser' ? slides[currentSlideIndex].backgroundColor : document.getElementById('pen-color-picker').value,
+                        size: size, points: [{ x: startX, y: startY }]
+                    };
+                    slides[currentSlideIndex].paths.push(newStroke);
+                } else if (currentTool === 'rectangle' || currentTool === 'circle' || currentTool === 'line') {
+                    shapeStartX = startX;
+                    shapeStartY = startY;
+                    previewSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                }
+            }
+
+            function draw(e) {
+                if (!isDrawing) return;
+                e.preventDefault();
+                var coords = getEventCoordinates(e);
+                var currentX = coords[0];
+                var currentY = coords[1];
+                
+                if (isDragging && selectedShapeIndex !== null) {
+                    var path = slides[currentSlideIndex].paths[selectedShapeIndex];
+                    if (path.type === 'line') {
+                        var dx = currentX - dragOffsetX - path.x1;
+                        var dy = currentY - dragOffsetY - path.y1;
+                        path.x1 += dx; path.y1 += dy;
+                        path.x2 += dx; path.y2 += dy;
+                    } else {
+                        path.x = currentX - dragOffsetX;
+                        path.y = currentY - dragOffsetY;
+                    }
+                    drawSlide(currentSlideIndex);
+                } else if (isResizing && selectedShapeIndex !== null) {
+                    resizeElement(currentX, currentY);
+                    drawSlide(currentSlideIndex);
+                } else if (shapeStartX !== undefined) {
+                    ctx.putImageData(previewSnapshot, 0, 0);
+                    var tempPath = {
+                        color: document.getElementById('shape-stroke-color-picker').value,
+                        size: document.getElementById('shape-stroke-size').value,
+                        isFilled: document.getElementById('fill-shape-checkbox').checked,
+                        fillColor: document.getElementById('fill-color-picker').value,
+                        x: shapeStartX, y: shapeStartY, width: currentX - shapeStartX, height: currentY - shapeStartY,
+                        x1: shapeStartX, y1: shapeStartY, x2: currentX, y2: currentY
+                    };
+                    if (currentTool === 'line') {
+                        drawLine(tempPath);
+                    } else {
+                        tempPath.shape = currentTool;
+                        drawShape(tempPath);
+                    }
+                } else {
+                    var currentPath = slides[currentSlideIndex].paths[slides[currentSlideIndex].paths.length - 1];
+                    if (currentPath && currentPath.type === 'stroke') {
+                        currentPath.points.push({ x: currentX, y: currentY });
+                        drawStroke(currentPath);
+                    }
+                }
+            }
+
+            function stopDrawing(e) {
+                if (!isDrawing) return;
+                var wasDrawingShape = (shapeStartX !== undefined);
+                if (wasDrawingShape && e) {
+                    var coords = getEventCoordinates(e);
+                    var endX = coords[0];
+                    var endY = coords[1];
+                    var pathData = {
+                        color: document.getElementById('shape-stroke-color-picker').value,
+                        size: document.getElementById('shape-stroke-size').value,
+                    };
+                    if (currentTool === 'line') {
+                        pathData.type = 'line';
+                        pathData.x1 = shapeStartX; pathData.y1 = shapeStartY;
+                        pathData.x2 = endX; pathData.y2 = endY;
+                    } else {
+                        pathData.type = 'shape'; pathData.shape = currentTool;
+                        pathData.isFilled = document.getElementById('fill-shape-checkbox').checked;
+                        pathData.fillColor = document.getElementById('fill-color-picker').value;
+                        pathData.x = Math.min(shapeStartX, endX); pathData.y = Math.min(shapeStartY, endY);
+                        pathData.width = Math.abs(endX - shapeStartX); pathData.height = Math.abs(endY - shapeStartY);
+                    }
+                    if ((pathData.width !== undefined && (pathData.width > 0 || pathData.height > 0)) || pathData.x2 !== undefined) {
+                        slides[currentSlideIndex].paths.push(pathData);
+                    }
+                }
+                isDrawing = false; isDragging = false; isResizing = false;
+                resizeHandle = ''; shapeStartX = undefined; previewSnapshot = null;
+                drawSlide(currentSlideIndex);
+            }
+            
+            function handleSelection(x, y) {
+                var paths = slides[currentSlideIndex].paths;
+                var clickedOnSomething = false;
+
+                if (selectedShapeIndex !== null) {
+                    var selected = paths[selectedShapeIndex];
+                    var handle = getHandleAt(x, y, selected);
+                    if (handle) {
+                        isDrawing = true; isResizing = true; resizeHandle = handle;
+                        return;
+                    }
+                }
+                
+                for (var i = paths.length - 1; i >= 0; i--) {
+                    if (isPointInElement(x, y, paths[i])) {
+                        selectedShapeIndex = i; isDrawing = true; isDragging = true;
+                        var path = paths[i];
+                        dragOffsetX = (path.type === 'line') ? x - path.x1 : x - path.x;
+                        dragOffsetY = (path.type === 'line') ? y - path.y1 : y - path.y;
+                        clickedOnSomething = true;
+                        break;
+                    }
+                }
+                
+                if (!clickedOnSomething) selectedShapeIndex = null;
+                drawSlide(currentSlideIndex);
+            }
+
+            function resizeElement(mouseX, mouseY) {
+                var element = slides[currentSlideIndex].paths[selectedShapeIndex];
+                if (element.type === 'line') {
+                    if (resizeHandle === 'tl') { element.x1 = mouseX; element.y1 = mouseY; } 
+                    else if (resizeHandle === 'br') { element.x2 = mouseX; element.y2 = mouseY; }
+                } else if (element.type === 'shape') {
+                    var x = element.x; var y = element.y; var width = element.width; var height = element.height;
+                    if (resizeHandle.indexOf('r') > -1) element.width = mouseX - x;
+                    if (resizeHandle.indexOf('l') > -1) { element.width = x + width - mouseX; element.x = mouseX; }
+                    if (resizeHandle.indexOf('b') > -1) element.height = mouseY - y;
+                    if (resizeHandle.indexOf('t') > -1) { element.height = y + height - mouseY; element.y = mouseY; }
+                }
+            }
+            
+            function eraseEntireStrokeAt(x, y) {
+                var didErase = false;
+                var paths = slides[currentSlideIndex].paths;
+                var newPaths = [];
+                for (var i = 0; i < paths.length; i++) {
+                    var path = paths[i];
+                    var wasHit = false;
+                    if (path.type === 'stroke' && !didErase) {
+                        for (var j = 0; j < path.points.length; j++) {
+                            if (Math.hypot(path.points[j].x - x, path.points[j].y - y) < 20) { wasHit = true; break; }
+                        }
+                    }
+                    if (wasHit) { didErase = true; } else { newPaths.push(path); }
+                }
+                if (didErase) { slides[currentSlideIndex].paths = newPaths; drawSlide(currentSlideIndex); }
+            }
+
+            function getEventCoordinates(e) {
+                var rect = canvas.getBoundingClientRect();
+                var scaleX = canvas.width / rect.width; var scaleY = canvas.height / rect.height;
+                var clientX = 0; var clientY = 0;
+                if (e) {
+                    if (e.clientX) { clientX = e.clientX; clientY = e.clientY; } 
+                    else if (e.touches && e.touches.length > 0) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; }
+                }
+                return [(clientX - rect.left) * scaleX, (clientY - rect.top) * scaleY];
+            }
+
+            function isPointInElement(x, y, path) {
+                if (path.type === 'shape') {
+                    var inBoundingBox = (x >= path.x && x <= path.x + path.width && y >= path.y && y <= path.y + path.height);
+                    if (!inBoundingBox) return false;
+                    if (path.shape === 'rectangle') return true; 
+                    else if (path.shape === 'circle') {
+                        var radius = Math.sqrt(Math.pow(path.width, 2) + Math.pow(path.height, 2)) / 2;
+                        return Math.hypot(x - (path.x + path.width/2), y - (path.y + path.height/2)) < radius;
+                    }
+                } else if (path.type === 'line') {
+                    var dist = Math.abs((path.y2 - path.y1) * x - (path.x2 - path.x1) * y + path.x2 * path.y1 - path.y2 * path.x1) / Math.hypot(path.y2 - path.y1, path.x2 - path.x1);
+                    var len = Math.hypot(path.x2 - path.x1, path.y2 - path.y1);
+                    var d1 = Math.hypot(x-path.x1, y-path.y1); var d2 = Math.hypot(x-path.x2, y-path.y2);
+                    return dist < (path.size / 2) + 5 && d1 <= len && d2 <= len;
+                }
+                return false;
+            }
+
+            function getHandles(path) {
+                if(path.type === 'line') {
+                    return {
+                        points: { tl: { x: path.x1, y: path.y1 }, br: { x: path.x2, y: path.y2 } },
+                        box: { x: Math.min(path.x1, path.x2), y: Math.min(path.y1, path.y2), width: Math.abs(path.x2-path.x1), height: Math.abs(path.y2-path.y1) }
+                    };
+                } else { // shape
+                    var x = path.x; var y = path.y; var width = path.width; var height = path.height;
+                    return {
+                        points: { tl: { x: x, y: y }, tr: { x: x + width, y: y }, bl: { x: x, y: y + height }, br: { x: x + width, y: y + height } },
+                        box: { x: x, y: y, width: width, height: height }
+                    };
+                }
+            }
+
+            function getHandleAt(x, y, shape) {
+                var handles = getHandles(shape).points;
+                for (var name in handles) {
+                    if (Object.prototype.hasOwnProperty.call(handles, name)) {
+                        if (Math.hypot(handles[name].x - x, handles[name].y - y) < 8) return name;
+                    }
+                }
+                return null;
+            }
+
+            function selectTool(toolName) {
+                currentTool = toolName;
+                selectedShapeIndex = null;
+                var isPenLike = ['pen', 'marker'].indexOf(toolName) > -1;
+                var isShapeLike = ['line', 'rectangle', 'circle'].indexOf(toolName) > -1;
+                
+                penOptionsWrapper.classList.toggle('hidden', !isPenLike);
+                eraserOptionsWrapper.classList.toggle('hidden', toolName !== 'eraser');
+                shapeStrokeOptionsWrapper.classList.toggle('hidden', !isShapeLike && toolName !== 'select');
+                shapeFillOptionsWrapper.classList.toggle('hidden', !isShapeLike && toolName !== 'select');
+                
+                drawSlide(currentSlideIndex);
+                document.querySelectorAll('.tool').forEach(function(b) { b.classList.remove('active'); });
+                document.getElementById(toolName + '-tool').classList.add('active');
+                
+                var cursor = 'crosshair';
+                if (toolName === 'select') cursor = 'default';
+                else if (toolName === 'stroke-eraser') cursor = 'grab';
+                else if (toolName === 'eraser') cursor = 'cell';
+                canvas.style.cursor = cursor;
+            }
+            
+            function deleteSelectedElement() {
+                if (selectedShapeIndex !== null) {
+                    slides[currentSlideIndex].paths.splice(selectedShapeIndex, 1);
+                    selectedShapeIndex = null;
+                    drawSlide(currentSlideIndex);
+                }
+            }
+
+            function addEventListeners() {
+                canvas.addEventListener('mousedown', startDrawing);
+                canvas.addEventListener('mousemove', draw);
+                canvas.addEventListener('mouseup', stopDrawing);
+                canvas.addEventListener('mouseout', stopDrawing);
+                canvas.addEventListener('touchstart', startDrawing, { passive: false });
+                canvas.addEventListener('touchmove', draw, { passive: false });
+                canvas.addEventListener('touchend', stopDrawing);
+                
+                window.addEventListener('keydown', function(e) {
+                    if (e.key === 'Delete' || e.key === 'Backspace') {
+                        deleteSelectedElement();
+                    }
+                });
+
+                document.getElementById('set-board-size').addEventListener('click', resizeCanvas);
+                
+                var toolIds = ['pen', 'marker', 'eraser', 'select', 'rectangle', 'circle', 'stroke-eraser', 'line'];
+                toolIds.forEach(function(id) {
+                    document.getElementById(id + '-tool').addEventListener('click', function() { selectTool(id); });
+                });
+                
+                document.getElementById('bg-color-picker').addEventListener('input', function(e) {
+                    if (slides[currentSlideIndex]) slides[currentSlideIndex].backgroundColor = e.target.value;
+                    drawSlide(currentSlideIndex);
+                });
+                document.getElementById('clear-board').addEventListener('click', function() {
+                    if (confirm('Clear slide?')) {
+                        if (slides[currentSlideIndex]) slides[currentSlideIndex].paths = [];
+                        selectedShapeIndex = null;
+                        drawSlide(currentSlideIndex);
+                    }
+                });
+                document.getElementById('download-board').addEventListener('click', function() {
+                    selectedShapeIndex = null; drawSlide(currentSlideIndex);
+                    var link = document.createElement('a');
+                    link.download = 'slide-' + (currentSlideIndex + 1) + '.png';
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                });
+                
+                function setupSlideControl(id, action) {
+                    document.getElementById(id).addEventListener('click', function() {
+                        selectedShapeIndex = null;
+                        action();
+                        updateSlideIndicator();
+                        drawSlide(currentSlideIndex);
+                    });
+                }
+                setupSlideControl('add-slide', function() { slides.push({ paths: [], backgroundColor: '#1a1a1a' }); currentSlideIndex = slides.length - 1; });
+                setupSlideControl('delete-slide', function() { if (slides.length > 1) { slides.splice(currentSlideIndex, 1); currentSlideIndex = Math.min(currentSlideIndex, slides.length - 1); } });
+                setupSlideControl('prev-slide', function() { if (currentSlideIndex > 0) currentSlideIndex--; });
+                setupSlideControl('next-slide', function() { if (currentSlideIndex < slides.length - 1) currentSlideIndex++; });
+            }
+            
+            initializeCanvas();
+        });
+    </script>
+</body>
+</html>
